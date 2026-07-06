@@ -47,5 +47,15 @@ const body = applyAgent.buildEmailText(profile, jobWithEmail, tailored);
 check("email body names role", body.includes("AI Engineer"));
 check("email body no fabricated skill", !/java|aws/i.test(body));
 
+// Cover letter wiring (letter passed in — no LLM here)
+const letter = { text: "Dear Hiring Team, I'm applying for the ML Engineer role at DataCorp. Best, Ram D" };
+const appCL = applyAgent.prepareApplication(profile, jobNoEmail, tailored, [], {}, letter);
+check("cover letter stored on app", appCL.coverLetter === letter.text);
+check("cheat sheet includes cover letter", appCL.cheatSheet.includes("Cover letter") && appCL.cheatSheet.includes("applying for the ML Engineer"));
+
+// When the channel is email, the letter becomes the email body
+const appEmailCL = applyAgent.prepareApplication(profile, { ...jobWithEmail, applyEmail: "careers@acme.io" }, tailored, [], {}, letter);
+check("no-cover-letter app → letter null, still builds", applyAgent.prepareApplication(profile, jobNoEmail, tailored).coverLetter === null);
+
 console.log(`\n${pass ? "✅ apply eval PASSED" : "❌ apply eval FAILED"}`);
 process.exit(pass ? 0 : 1);

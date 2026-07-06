@@ -33,9 +33,10 @@ function buildEmailText(profile, job, tailored) {
   );
 }
 
-function buildCheatSheet(job, tailored, channel, known = [], unknown = []) {
+function buildCheatSheet(job, tailored, channel, known = [], unknown = [], coverLetter = null) {
   const bullets = tailored.highlights.map((h) => `• ${h}`).join("\n");
   const link = channel.url ? `\n🔗 Apply here: ${channel.url}\n` : "\n";
+  const letterBlock = coverLetter ? `\n\n*Cover letter*\n${coverLetter}` : "";
   let qBlock = "";
   if (known.length) {
     qBlock += `\n\n*Answers I already have for you:*\n${known
@@ -53,6 +54,7 @@ function buildCheatSheet(job, tailored, channel, known = [], unknown = []) {
     `*Summary*\n${tailored.summary}\n\n` +
     `*Skills*\n${tailored.skills.join(", ")}` +
     (bullets ? `\n\n*Highlights*\n${bullets}` : "") +
+    letterBlock +
     qBlock +
     `\n\n(Everything above comes straight from your resume — no made-up claims.)`
   );
@@ -61,7 +63,7 @@ function buildCheatSheet(job, tailored, channel, known = [], unknown = []) {
 // Prepare (but do not send) an application. Returns everything needed to confirm.
 // questions: required application questions (e.g. Greenhouse). savedAnswers: label→answer
 // the user already gave on a past application (reused, never asked twice — blueprint §6).
-function prepareApplication(profile, job, tailored, questions = [], savedAnswers = {}) {
+function prepareApplication(profile, job, tailored, questions = [], savedAnswers = {}, coverLetter = null) {
   const channel = detectChannel(job);
   const subject = `Application for ${job.title} — ${profile.name || "Candidate"}`;
   const known = [];
@@ -71,13 +73,16 @@ function prepareApplication(profile, job, tailored, questions = [], savedAnswers
     if (saved) known.push({ label: q.label, answer: saved });
     else if (q.required) unknown.push(q);
   }
+  const letter = coverLetter && coverLetter.text ? coverLetter.text : null;
   return {
     channel,
     subject,
     knownAnswers: known,
     unknownQuestions: unknown,
-    emailText: channel.tier === "email" ? buildEmailText(profile, job, tailored) : null,
-    cheatSheet: buildCheatSheet(job, tailored, channel, known, unknown),
+    coverLetter: letter,
+    // Prefer the real tailored cover letter for the email body; fall back to the generic builder.
+    emailText: channel.tier === "email" ? letter || buildEmailText(profile, job, tailored) : null,
+    cheatSheet: buildCheatSheet(job, tailored, channel, known, unknown, letter),
     tailored,
   };
 }

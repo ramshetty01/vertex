@@ -4,6 +4,17 @@ Running recap of build sessions. Newest first. Each entry: what shipped, evals, 
 
 ---
 
+## 2026-07-06 — Cover letter agent
+
+### Cover letter — `agents/coverletter.js`
+- **Why:** blueprint §26 ("a tailored resume variant, a cover letter if required") — spec'd, not yet built. Sibling to `agents/tailor.js`.
+- **Built:** `writeCoverLetter(profile, job, tailored)` → `{ text }`. Strong tier, ONLY profile facts (§2.8), 120-180 words / 3 paras. Code-side fallback template (pure profile fields) on any LLM/JSON failure; strips a stray leading "Here is…" line.
+- **Wired:** `startApply` generates it alongside the tailored resume → `prepareApplication(...coverLetter)` → becomes the EMAIL BODY (preferred over generic builder) + a *Cover letter* block in the assisted cheat sheet.
+- **Evals:** `test-coverletter.js` 7/7 incl no-fabrication (job wants Java+AWS, both absent → letter claims neither). `test-apply.js` 13/13 (cover letter stored, in cheat sheet, null when absent). `test-flow.js` still 22/22.
+- Not yet committed at time of writing this entry → see commit in git log.
+
+---
+
 ## 2026-07-06 — Session: profile editing, proactive matches, live-key wiring
 
 ### 1. Field-level profile correction — `agents/editor.js` (commit `cbcc3f7`)

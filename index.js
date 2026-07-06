@@ -18,6 +18,7 @@ const editor = require("./agents/editor");
 const matcher = require("./agents/matcher");
 const { answerQuestion } = require("./agents/inquiry");
 const { tailorResume, formatTailoredPreview } = require("./agents/tailor");
+const { writeCoverLetter } = require("./agents/coverletter");
 const applyAgent = require("./agents/apply");
 const { fetchJobs, dedupe, jobKey } = require("./lib/jobs");
 const ats = require("./lib/ats");
@@ -488,12 +489,13 @@ function startApply(user, from, job) {
   (async () => {
     try {
       const tailored = await tailorResume(user.profile, job);
+      const coverLetter = await writeCoverLetter(user.profile, job, tailored).catch(() => null);
       // Greenhouse exposes the required application questions — fetch them for the cheat sheet.
       let questions = [];
       if (job._ats && job._ats.platform === "greenhouse") {
         questions = await ats.fetchGreenhouseQuestions(job._ats.token, job._ats.id).catch(() => []);
       }
-      const app = applyAgent.prepareApplication(user.profile, job, tailored, questions, user.savedAnswers);
+      const app = applyAgent.prepareApplication(user.profile, job, tailored, questions, user.savedAnswers, coverLetter);
       user.pendingApply = { job, app };
       user.state = "CONFIRM_APPLY";
       const how =
