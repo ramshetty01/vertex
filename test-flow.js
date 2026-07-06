@@ -173,6 +173,17 @@ const check = (n, ok) => { console.log(`  ${ok ? "✅" : "❌"} ${n}`); if (!ok)
   await bot.handleInbound(inb("u5b", "status"));
   check("digest shows interviewing", /interviewing/i.test(lastText()));
 
+  // cancel escapes the update sub-flow back to the prior state
+  const sc = bot.getUser("u5d");
+  sc.profile = { name: "Ram", skills: [{ name: "Python" }] };
+  sc.applications = [{ title: "AI Engineer", company: "Acme", tier: "assisted", status: "Submitted", ts: Date.now() }];
+  sc.state = "DONE";
+  await bot.handleInbound(inb("u5d", "update")); // → UPDATE_PICK_APP
+  sent = [];
+  await bot.handleInbound(inb("u5d", "cancel"));
+  check("cancel exits update flow", /cancelled/i.test(lastText()));
+  check("cancel restores prior state (DONE)", bot.getUser("u5d").state === "DONE");
+
   // no open applications → friendly message
   const s2 = bot.getUser("u5c");
   s2.applications = [{ title: "X", company: "Y", tier: "assisted", status: "Closed", ts: Date.now() }];

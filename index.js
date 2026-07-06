@@ -1049,6 +1049,12 @@ async function handleInbound(inbound) {
 
       // ---------- Status check-in: which application (blueprint §119) ----------
       case "UPDATE_PICK_APP": {
+        if (["cancel", "back", "exit", "stop"].includes(cmd)) {
+          user.state = user.statusReturnState || "DONE";
+          user.statusReturnState = null;
+          reply("👍 No problem — cancelled. Type *status* anytime to see your applications.");
+          break;
+        }
         const m = /^app_(\d+)$/.exec(text);
         const idx = m ? parseInt(m[1], 10) : NaN;
         const app = user.applications && user.applications[idx];
@@ -1073,6 +1079,13 @@ async function handleInbound(inbound) {
 
       // ---------- Status check-in: set the new status ----------
       case "UPDATE_PICK_STATUS": {
+        if (["cancel", "back", "exit", "stop"].includes(cmd)) {
+          user.pendingStatusIdx = null;
+          user.state = user.statusReturnState || "DONE";
+          user.statusReturnState = null;
+          reply("👍 Cancelled — nothing changed.");
+          break;
+        }
         const idx = user.pendingStatusIdx;
         const app = user.applications && user.applications[idx];
         const m = /^st_(.+)$/.exec(text);
