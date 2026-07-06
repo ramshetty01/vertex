@@ -181,6 +181,28 @@ const check = (n, ok) => { console.log(`  ${ok ? "✅" : "❌"} ${n}`); if (!ok)
   await bot.handleInbound(inb("u5c", "update"));
   check("no open apps → guidance, no list", /no open applications/i.test(lastText()) && !sent.some((x) => x.spec && x.spec.list));
 
+  // ---- Duplicate-application guard ----
+  check("alreadyApplied true for matching job",
+    bot.alreadyApplied({ applications: [{ title: "AI Eng", company: "Acme" }] }, { title: "ai eng", company: "ACME" }) === true);
+  check("alreadyApplied false for new job",
+    bot.alreadyApplied({ applications: [{ title: "AI Eng", company: "Acme" }] }, { title: "ML Eng", company: "Acme" }) === false);
+
+  const d = bot.getUser("u6dup");
+  d.profile = { name: "Ram", skills: [{ name: "Python" }] };
+  d.paid = true;
+  d.applications = [{ title: "AI Engineer", company: "Acme", tier: "assisted", status: "Prepared", ts: Date.now() }];
+  d.matches = [
+    { title: "AI Engineer", company: "Acme", location: "Remote", salary: "-", description: "x", fit: 90, strengths: "x", gaps: "None significant" },
+    { title: "ML Engineer", company: "Acme", location: "Remote", salary: "-", description: "x", fit: 85, strengths: "x", gaps: "None significant" },
+  ];
+  d.currentJobIndex = 0;
+  d.state = "AWAITING_JOB_RESPONSE";
+  sent = [];
+  await bot.handleInbound(inb("u6dup", "1")); // Interested on the already-applied job
+  await wait(10);
+  check("dup apply → 'already applied' + advances", /already applied/i.test(lastText()));
+  check("dup apply → did NOT enter PREPARING_APPLY", bot.getUser("u6dup").state !== "PREPARING_APPLY");
+
   // ---- Invite / referral command ----
   sent = [];
   await bot.handleInbound(inb("u1", "invite"));

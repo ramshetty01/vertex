@@ -560,9 +560,24 @@ function appliesInLast24h(user) {
 }
 const applyQuotaExceeded = (user) => APPLIES_PER_DAY > 0 && appliesInLast24h(user) >= APPLIES_PER_DAY;
 
+// Have we already prepared/sent an application to this exact job? (title+company, case-insensitive)
+function alreadyApplied(user, job) {
+  const key = `${(job.title || "").toLowerCase()}|${(job.company || "").toLowerCase()}`;
+  return (user.applications || []).some((a) => `${(a.title || "").toLowerCase()}|${(a.company || "").toLowerCase()}` === key);
+}
+
 // Interested → tailor a resume, prepare the application, and ask for one-tap confirm
 // (CLAUDE.md §2.9: nothing goes out externally without explicit confirmation).
 function startApply(user, from, job) {
+  // Don't apply twice to the same job (can resurface via the proactive sweep / revisits).
+  if (alreadyApplied(user, job)) {
+    (async () => {
+      await pushItem(from, withAck(advanceToNext(user),
+        `✅ You've already applied to *${job.title}* at ${job.company} — moving on.`));
+      persist(from);
+    })();
+    return;
+  }
   // Daily cap — refuse before spending LLM cost; let the user keep browsing.
   if (applyQuotaExceeded(user)) {
     user.state = "AWAITING_JOB_RESPONSE";
@@ -1252,4 +1267,4 @@ if (require.main === module) {
   app.listen(PORT, () => console.log(`🚀 Job bot listening on port ${PORT}`));
 }
 
-module.exports = { handleInbound, getUser, users, buildDigest, buildWeeklyDigest, profileTip, runProactiveMatches, runDigestPush, appliesInLast24h, applyQuotaExceeded, APPLIES_PER_DAY };
+module.exports = { handleInbound, getUser, users, buildDigest, buildWeeklyDigest, profileTip, runProactiveMatches, runDigestPush, appliesInLast24h, applyQuotaExceeded, alreadyApplied, APPLIES_PER_DAY };

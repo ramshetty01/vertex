@@ -4,6 +4,14 @@ Running recap of build sessions. Newest first. Each entry: what shipped, evals, 
 
 ---
 
+## 2026-07-06 — Fast burst: invite command + duplicate-apply guard
+
+- **invite/share/refer** command → forwardable pitch + wa.me deep link to the bot (BOT_WA_NUMBER). Pilot growth loop. Added to menu.
+- **Duplicate-apply guard**: alreadyApplied(user, job) (title+company, case-insensitive); startApply short-circuits with "already applied" + advances, before any LLM cost. Stops dupes from proactive re-surfacing / revisits.
+- flow 38/38.
+
+---
+
 ## 2026-07-06 — Fix: email apply attaches the real resume PDF
 
 - Bug: submitEmail attached the cover-letter text as a file named `resume.txt` — a fake resume; the user's actual uploaded PDF was never sent.
