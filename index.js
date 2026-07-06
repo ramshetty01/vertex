@@ -638,8 +638,13 @@ function inviteMessage() {
   return `📣 *Know someone job-hunting? Forward this:*\n\n${pitch}\n${link}`;
 }
 
-// Paywall (blueprint §5): free to browse/skip; the first Interested/Inquire needs payment.
-const requiresPayment = (user) => payments.enabled() && !user.paid;
+// Paywall (blueprint §5): the first FREE_CARDS matches are fully free to act on
+// (Interested/Inquire). The paywall only kicks in from card number FREE_CARDS+1
+// onward, so users get real value before being asked to pay. currentJobIndex is
+// 0-based, so index >= FREE_CARDS means they've already acted on that many cards.
+const FREE_CARDS = parseInt(process.env.FREE_CARDS || "3", 10);
+const requiresPayment = (user) =>
+  payments.enabled() && !user.paid && (user.currentJobIndex || 0) >= FREE_CARDS;
 
 // Send a payment link and park the user until Razorpay's webhook unlocks them.
 function startPaywall(user, from, action) {
@@ -1277,4 +1282,4 @@ if (require.main === module) {
   app.listen(PORT, () => console.log(`🚀 Job bot listening on port ${PORT}`));
 }
 
-module.exports = { handleInbound, getUser, users, buildDigest, buildWeeklyDigest, profileTip, runProactiveMatches, runDigestPush, appliesInLast24h, applyQuotaExceeded, alreadyApplied, APPLIES_PER_DAY };
+module.exports = { handleInbound, getUser, users, buildDigest, buildWeeklyDigest, profileTip, runProactiveMatches, runDigestPush, appliesInLast24h, applyQuotaExceeded, alreadyApplied, requiresPayment, APPLIES_PER_DAY, FREE_CARDS };
