@@ -107,6 +107,8 @@ function getUser(from) {
         matches: [],        // real scored jobs, filled in by the matcher
         currentJobIndex: 0,
         seenJobKeys: [],    // every job key ever shown — so proactive push only surfaces NEW ones
+        pendingStatusIdx: null,  // application index being status-updated
+        statusReturnState: null, // state to resume after a status check-in
       }
     );
   }
@@ -444,6 +446,28 @@ const APPLY_BUTTONS = [
   { id: "2", title: "✋ Skip" },
 ];
 
+// Application status ladder (blueprint §119). Auto-detection (email/ATS) is external,
+// so the user drives progress with one-tap "any update?" check-ins.
+const STATUS_LADDER = ["Prepared", "Submitted", "Viewed", "Response", "Interview", "Closed"];
+const STATUS_EMOJI = { Prepared: "📝", Submitted: "📨", Viewed: "👀", Response: "💬", Interview: "🎤", Closed: "📁" };
+const statusRank = (s) => { const i = STATUS_LADDER.indexOf(s); return i < 0 ? 0 : i; };
+
+// Applications the user can still update (everything not Closed), newest first.
+function activeApplications(user) {
+  return (user.applications || [])
+    .map((a, idx) => ({ a, idx }))
+    .filter(({ a }) => a.status !== "Closed")
+    .reverse();
+}
+
+// Status choices ahead of the current one (you can only move forward), + Closed.
+function statusPickRows(current) {
+  return STATUS_LADDER.slice(statusRank(current) + 1).map((s) => ({
+    id: `st_${s}`,
+    title: `${STATUS_EMOJI[s] || ""} ${s}`.trim(),
+  }));
+}
+
 // Application tracker / weekly-digest content (blueprint §9 retention loop).
 function buildDigest(user) {
   const apps = user.applications || [];
@@ -451,18 +475,18 @@ function buildDigest(user) {
   if (!apps.length && !remaining) {
     return "📊 No applications yet. Send your resume as a *PDF* to get matched with jobs!";
   }
-  const submitted = apps.filter((a) => a.status === "Submitted").length;
-  const prepared = apps.filter((a) => a.status === "Prepared").length;
+  const submitted = apps.filter((a) => statusRank(a.status) >= statusRank("Submitted")).length;
+  const interviews = apps.filter((a) => a.status === "Interview").length;
   const list = apps
     .slice(-8)
-    .map((a) => `• ${a.title} @ ${a.company} — _${a.status}_`)
+    .map((a) => `${STATUS_EMOJI[a.status] || "•"} ${a.title} @ ${a.company} — _${a.status}_`)
     .join("\n");
   return (
     `📊 *Your job search so far*\n\n` +
-    `• Applications: *${apps.length}* (${submitted} sent, ${prepared} prepared)\n` +
+    `• Applications: *${apps.length}* (${submitted} submitted+${interviews ? `, ${interviews} interviewing` : ""})\n` +
     `• Matches still to review: *${remaining}*\n` +
     (list ? `\n${list}\n` : "") +
-    `\n💡 Tip: type *edit* to refresh your profile, or *restart* to see new matches.`
+    `\n💡 Got news on any? Type *update* to log progress. Or *restart* for new matches.`
   );
 }
 
@@ -613,12 +637,30 @@ async function handleInbound(inbound) {
           "• *Send a PDF* — upload/update your resume\n" +
           "• *edit* — review & update your profile\n" +
           "• *status* — your applications & progress\n" +
+          "• *update* — log progress on an application (viewed / interview…)\n" +
           "• *back* — re-show the current job\n" +
           "• *restart* — start over\n\n" +
           "On a job card, tap *Interested* / *Not interested* / *Ask about role* (or reply 1/2/3)."
       );
     } else if (["status", "digest", "applications", "progress"].includes(cmd)) {
       reply(buildDigest(user));
+    } else if (["update", "updates", "log"].includes(cmd)) {
+      // One-tap "any update?" check-in (blueprint §119): pick an application, then a new status.
+      const active = activeApplications(user);
+      if (!active.length) {
+        reply("You've no open applications to update yet. Apply to a job first, then type *update*. 🙂");
+      } else {
+        user.statusReturnState = user.state; // resume here after the update
+        user.state = "UPDATE_PICK_APP";
+        replyList(
+          "📮 Which application got an update?",
+          "Pick one",
+          active.slice(0, 10).map(({ a, idx }) => ({
+            id: `app_${idx}`,
+            title: `${a.title} @ ${a.company}`.slice(0, 24),
+          }))
+        );
+      }
     } else if (cmd === "edit" || cmd === "edit profile") {
       if (!user.profile) {
         reply("You haven't sent a resume yet — send it as a *PDF* to begin. 📄");
@@ -924,6 +966,54 @@ async function handleInbound(inbound) {
         break;
       }
 
+      // ---------- Status check-in: which application (blueprint §119) ----------
+      case "UPDATE_PICK_APP": {
+        const m = /^app_(\d+)$/.exec(text);
+        const idx = m ? parseInt(m[1], 10) : NaN;
+        const app = user.applications && user.applications[idx];
+        if (!app) {
+          const active = activeApplications(user);
+          replyList("Please pick one:", "Pick one", active.slice(0, 10).map(({ a, idx: i }) => ({
+            id: `app_${i}`, title: `${a.title} @ ${a.company}`.slice(0, 24),
+          })));
+          break; // stay until a valid pick
+        }
+        user.pendingStatusIdx = idx;
+        const rows = statusPickRows(app.status);
+        if (!rows.length) {
+          user.state = user.statusReturnState || "DONE";
+          reply(`That application is already at *${app.status}* — nothing further to log. 👍`);
+          break;
+        }
+        user.state = "UPDATE_PICK_STATUS";
+        replyList(`Current: _${app.status}_. What's the new status for *${app.title}*?`, "Pick status", rows);
+        break;
+      }
+
+      // ---------- Status check-in: set the new status ----------
+      case "UPDATE_PICK_STATUS": {
+        const idx = user.pendingStatusIdx;
+        const app = user.applications && user.applications[idx];
+        const m = /^st_(.+)$/.exec(text);
+        const newStatus = m && STATUS_LADDER.includes(m[1]) ? m[1] : null;
+        if (!app || !newStatus) {
+          if (app) replyList("Please pick a status:", "Pick status", statusPickRows(app.status));
+          else { user.state = user.statusReturnState || "DONE"; reply("Hmm, lost track of that one — type *update* to try again."); }
+          break;
+        }
+        app.status = newStatus;
+        app.updatedAt = Date.now();
+        applyAgent.recordApplication({
+          from, job: { title: app.title, company: app.company }, tier: app.tier, status: newStatus, event: "status_update",
+        });
+        user.pendingStatusIdx = null;
+        user.state = user.statusReturnState || "DONE";
+        user.statusReturnState = null;
+        const cheer = newStatus === "Interview" ? " 🎉 Fingers crossed!" : newStatus === "Response" ? " Nice — they're engaging!" : "";
+        reply(`${STATUS_EMOJI[newStatus] || "✅"} Updated *${app.title}* → *${newStatus}*.${cheer}\n\nType *status* to see all, or *update* to log another.`);
+        break;
+      }
+
       // ---------- Stage 4: out of jobs ----------
       case "DONE": {
         reply(
@@ -1047,7 +1137,7 @@ app.get("/admin/stats", (req, res) => {
     if (user.profile) withProfile++;
     const apps = user.applications || [];
     totalApps += apps.length;
-    submitted += apps.filter((a) => a.status === "Submitted").length;
+    submitted += apps.filter((a) => statusRank(a.status) >= statusRank("Submitted")).length;
     users.push({
       id: maskId(id),
       state: user.state,

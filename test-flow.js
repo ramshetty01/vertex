@@ -140,6 +140,46 @@ const check = (n, ok) => { console.log(`  ${ok ? "✅" : "❌"} ${n}`); if (!ok)
   check("confirm → asks location (intake)", /where do you want to work/i.test(lastText()));
   check("state = INTAKE_LOCATION", bot.getUser("u4").state === "INTAKE_LOCATION");
 
+  // ---- Application status progression (blueprint §119) ----
+  const s = bot.getUser("u5b");
+  s.profile = { name: "Ram", skills: [{ name: "Python" }] };
+  s.applications = [{ title: "AI Engineer", company: "Acme", tier: "assisted", status: "Submitted", ts: Date.now() }];
+  s.state = "DONE";
+
+  // update → app list
+  sent = [];
+  await bot.handleInbound(inb("u5b", "update"));
+  check("update → app list shown", sent.some((x) => x.spec && x.spec.list));
+  check("state = UPDATE_PICK_APP", bot.getUser("u5b").state === "UPDATE_PICK_APP");
+
+  // pick the app → status list (forward stages only)
+  sent = [];
+  await bot.handleInbound(inb("u5b", "app_0"));
+  const statusRows = (sent.find((x) => x.spec && x.spec.list) || {}).spec?.list?.rows || [];
+  check("status list offers forward stages", statusRows.some((r) => r.id === "st_Interview"));
+  check("status list excludes past stages (no Prepared)", !statusRows.some((r) => r.id === "st_Prepared"));
+  check("state = UPDATE_PICK_STATUS", bot.getUser("u5b").state === "UPDATE_PICK_STATUS");
+
+  // set Interview → saved, returns to DONE
+  sent = [];
+  await bot.handleInbound(inb("u5b", "st_Interview"));
+  check("status saved as Interview", bot.getUser("u5b").applications[0].status === "Interview");
+  check("ack mentions Interview", /Interview/i.test(lastText()));
+  check("returned to prior state (DONE)", bot.getUser("u5b").state === "DONE");
+
+  // digest reflects the interview
+  sent = [];
+  await bot.handleInbound(inb("u5b", "status"));
+  check("digest shows interviewing", /interviewing/i.test(lastText()));
+
+  // no open applications → friendly message
+  const s2 = bot.getUser("u5c");
+  s2.applications = [{ title: "X", company: "Y", tier: "assisted", status: "Closed", ts: Date.now() }];
+  s2.state = "DONE";
+  sent = [];
+  await bot.handleInbound(inb("u5c", "update"));
+  check("no open apps → guidance, no list", /no open applications/i.test(lastText()) && !sent.some((x) => x.spec && x.spec.list));
+
   console.log(`\n${pass ? "✅ flow smoke test PASSED" : "❌ flow smoke test FAILED"}`);
   process.exit(pass ? 0 : 1);
 })();

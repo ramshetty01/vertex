@@ -4,6 +4,16 @@ Running recap of build sessions. Newest first. Each entry: what shipped, evals, 
 
 ---
 
+## 2026-07-06 — Application status progression (blueprint §119)
+
+- Full ladder `Prepared → Submitted → Viewed → Response → Interview → Closed` (`STATUS_LADDER` + per-stage emoji, `statusRank`).
+- One-tap "any update?" check-in: global command `update`/`updates`/`log` → `UPDATE_PICK_APP` (native list of open apps, non-Closed) → `UPDATE_PICK_STATUS` (list of forward stages only) → saves `app.status` + `updatedAt`, audits to `applications.jsonl` (`event:"status_update"`), returns to the prior state via `statusReturnState`.
+- Digest enriched (emoji per stage, interview count); `/admin/stats` "submitted" counts by rank so advanced stages still count. Added `update` to the menu.
+- Auto-detection (email/ATS) is external → deferred; the user drives progress, which is the right pilot slice.
+- Eval: `test-flow.js` now 32/32 (update→pick→forward-stages-only→save Interview→digest reflects→no-open-apps guidance).
+
+---
+
 ## 2026-07-06 — Admin dashboard (pilot monitoring UI)
 
 - **`public/admin.html`** + `GET /admin` route — visual Wizard-of-Oz dashboard: stat tiles (users / with-profile / paid / applications / submitted), users-by-state bars, per-user table (PII-masked ids), 10s auto-refresh, light/dark aware. Self-contained (inline CSS/JS, no CDN). Token entered at runtime, stored in the browser's localStorage only — never embedded in the page; sent as `X-Admin-Token` to the existing `/admin/stats`.
