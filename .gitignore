@@ -1,0 +1,12 @@
+.env
+resumes/
+node_modules/
+.wwebjs_auth/
+.wwebjs_cache/
+
+applications.jsonl
+
+bot.db
+bot.db-*
+.DS_Store
+settings.local.json

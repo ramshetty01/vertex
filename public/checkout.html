@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Checkout — Job Assistant</title>
+    <!-- Razorpay Standard Checkout -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <style>
+      body { font-family: system-ui, -apple-system, sans-serif; max-width: 420px; margin: 60px auto; padding: 0 20px; color: #1a1a1a; }
+      .card { border: 1px solid #e5e5e5; border-radius: 12px; padding: 28px; text-align: center; }
+      h1 { font-size: 20px; margin: 0 0 6px; }
+      .price { font-size: 34px; font-weight: 700; margin: 14px 0; }
+      button { background: #0b5cff; color: #fff; border: 0; border-radius: 8px; padding: 14px 22px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; }
+      button:disabled { opacity: 0.6; cursor: default; }
+      #status { margin-top: 16px; font-size: 14px; min-height: 20px; }
+      .ok { color: #0a7d33; }
+      .err { color: #c1121f; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Unlock full access</h1>
+      <div>Apply to jobs &amp; ask about roles</div>
+      <div class="price">₹149<span style="font-size:14px;font-weight:400">/week</span></div>
+      <button id="pay">Pay with Razorpay</button>
+      <div id="status"></div>
+    </div>
+
+    <script>
+      const AMOUNT_PAISE = 14900; // ₹149 — server also validates (>= 100 paise)
+      const btn = document.getElementById("pay");
+      const statusEl = document.getElementById("status");
+      const setStatus = (msg, cls) => { statusEl.textContent = msg; statusEl.className = cls || ""; };
+
+      async function startCheckout() {
+        btn.disabled = true;
+        setStatus("Creating order…");
+        try {
+          // Public key id (never the secret)
+          const cfg = await fetch("/api/config").then((r) => r.json());
+          if (!cfg.key_id) throw new Error("Razorpay not configured on server");
+
+          // STEP 1: create order on the backend
+          const order = await fetch("/api/create-order", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount: AMOUNT_PAISE, currency: "INR" }),
+          }).then(async (r) => {
+            if (!r.ok) throw new Error((await r.json()).error || "order failed");
+            return r.json();
+          });
+
+          // STEP 2: open the Razorpay modal
+          const rzp = new Razorpay({
+            key: cfg.key_id,
+            order_id: order.order_id,
+            amount: order.amount,
+            currency: order.currency,
+            name: "Job Assistant",
+            description: "Weekly access",
+            handler: async function (response) {
+              // STEP 3: verify signature on the backend
+              setStatus("Verifying payment…");
+              const v = await fetch("/api/verify-payment", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(response),
+              }).then((r) => r.json());
+              if (v.verified) setStatus("✅ Payment successful! You're unlocked.", "ok");
+              else setStatus("❌ Payment could not be verified. You were not charged access.", "err");
+              btn.disabled = false;
+            },
+            modal: {
+              ondismiss: function () {
+                setStatus("Payment cancelled.", "err");
+                btn.disabled = false;
+              },
+            },
+            theme: { color: "#0b5cff" },
+          });
+
+          rzp.on("payment.failed", function (resp) {
+            setStatus("❌ Payment failed: " + (resp.error && resp.error.description || "try again"), "err");
+            btn.disabled = false;
+          });
+
+          rzp.open();
+          setStatus("");
+        } catch (err) {
+          setStatus("❌ " + (err.message || "Something went wrong"), "err");
+          btn.disabled = false;
+        }
+      }
+
+      btn.addEventListener("click", startCheckout);
+    </script>
+  </body>
+</html>
