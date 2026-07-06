@@ -609,6 +609,20 @@ function startApply(user, from, job) {
   })();
 }
 
+// Referral / growth loop — a forwardable pitch + a wa.me deep link to this bot.
+// BOT_WA_NUMBER is the bot's public WhatsApp number (digits, e.g. 9198…); if unset,
+// the message still works but without a tappable link.
+const BOT_WA_NUMBER = (process.env.BOT_WA_NUMBER || "").replace(/\D/g, "");
+function inviteMessage() {
+  const pitch =
+    "🤖 Found a WhatsApp bot that matches jobs to your resume and helps you apply — all in chat. " +
+    "Send it your resume as a PDF to try it:";
+  const link = BOT_WA_NUMBER
+    ? `https://wa.me/${BOT_WA_NUMBER}?text=Hi`
+    : "(reply to this chat and I'll share the number)";
+  return `📣 *Know someone job-hunting? Forward this:*\n\n${pitch}\n${link}`;
+}
+
 // Paywall (blueprint §5): free to browse/skip; the first Interested/Inquire needs payment.
 const requiresPayment = (user) => payments.enabled() && !user.paid;
 
@@ -682,10 +696,13 @@ async function handleInbound(inbound) {
           "• *edit* — review & update your profile\n" +
           "• *status* — your applications & progress\n" +
           "• *update* — log progress on an application (viewed / interview…)\n" +
+          "• *invite* — share the bot with a friend\n" +
           "• *back* — re-show the current job\n" +
           "• *restart* — start over\n\n" +
           "On a job card, tap *Interested* / *Not interested* / *Ask about role* (or reply 1/2/3)."
       );
+    } else if (["invite", "share", "refer"].includes(cmd)) {
+      reply(inviteMessage());
     } else if (["status", "digest", "applications", "progress"].includes(cmd)) {
       reply(buildDigest(user));
     } else if (["update", "updates", "log"].includes(cmd)) {

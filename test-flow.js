@@ -6,6 +6,7 @@ process.env.MESSAGING_PROVIDER = "kapso"; // request provider → init is a no-o
 // llm.js constructs its client eagerly; the offline test never calls it (all stubbed),
 // but the client still needs a non-empty key to instantiate without throwing.
 process.env.NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || "offline-test-key";
+process.env.BOT_WA_NUMBER = "919876543210"; // for the invite command's wa.me link
 process.env.BOT_DB_PATH = require("path").join(require("os").tmpdir(), `bot-flow-${Date.now()}.db`);
 
 const messaging = require("./lib/messaging");
@@ -179,6 +180,12 @@ const check = (n, ok) => { console.log(`  ${ok ? "✅" : "❌"} ${n}`); if (!ok)
   sent = [];
   await bot.handleInbound(inb("u5c", "update"));
   check("no open apps → guidance, no list", /no open applications/i.test(lastText()) && !sent.some((x) => x.spec && x.spec.list));
+
+  // ---- Invite / referral command ----
+  sent = [];
+  await bot.handleInbound(inb("u1", "invite"));
+  check("invite → forwardable pitch", /Forward this/i.test(lastText()));
+  check("invite → wa.me link with bot number", /wa\.me\/919876543210/.test(lastText()));
 
   console.log(`\n${pass ? "✅ flow smoke test PASSED" : "❌ flow smoke test FAILED"}`);
   process.exit(pass ? 0 : 1);
