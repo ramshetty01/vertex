@@ -47,6 +47,9 @@ Do NOT set `PORT` — Railway injects it; the app reads `process.env.PORT`.
   `curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" https://<app>.up.railway.app/admin/run-matches`
 - It re-scores jobs for every user who finished onboarding and ran out of matches, and pushes
   only genuinely NEW jobs (deduped via each user's `seenJobKeys`).
+- Weekly retention heartbeat (blueprint §119): schedule a WEEKLY cron to POST the digest:
+  `curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" https://<app>.up.railway.app/admin/send-digest`
+  Sends each active user their tracker + a profile-improvement tip (skips empty/new users).
 - ⚠️ WhatsApp policy: pushing a user outside their 24h session window needs an APPROVED template.
   Within 24h (active pilot users) plain messages are fine. Wire a template before broad rollout.
 

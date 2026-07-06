@@ -490,6 +490,50 @@ function buildDigest(user) {
   );
 }
 
+// One concrete profile-improvement tip for the weekly digest (blueprint §119).
+// Picks the most useful nudge from what's missing/stalled; always returns something.
+function profileTip(user) {
+  const p = user.profile || {};
+  const skills = (p.skills || []).length;
+  const apps = user.applications || [];
+  const remaining = Math.max(0, (user.matches || []).length - user.currentJobIndex);
+  if (!p.total_experience_years && !skills) return "Send an updated resume PDF — the more detail, the better your matches.";
+  if (skills < 3) return "Add a few more skills to your profile (type *edit*) — it widens your matches.";
+  if (!(user.intake && user.intake.locationPref)) return "Set a location preference (type *edit*) so I can prioritise nearby roles.";
+  if (remaining > 0) return `You've *${remaining}* match${remaining > 1 ? "es" : ""} still to review — reply *restart* to see them.`;
+  const stalledSubmitted = apps.some((a) => a.status === "Submitted");
+  if (stalledSubmitted) return "Heard back from anyone? Type *update* to log interviews — it helps me tune your matches.";
+  return "Keep your resume fresh — re-send a PDF anytime to refine your matches.";
+}
+
+// Weekly digest content = the tracker + a profile-improvement tip (retention heartbeat).
+function buildWeeklyDigest(user) {
+  return `🗓️ *Your weekly job update*\n\n` + buildDigest(user) + `\n\n💡 *Tip:* ${profileTip(user)}`;
+}
+
+// Push the weekly digest to every onboarded user who has something worth hearing
+// (an application or matches still to review). Skips brand-new/empty users so we
+// don't spam. Same 24h-template caveat as the proactive sweep (see DEPLOY.md §6).
+async function runDigestPush(pushFn = (to, text) => sendMessage(to, text)) {
+  const summary = { swept: 0, sent: 0 };
+  for (const { id } of store.all()) {
+    const user = getUser(id);
+    if (!user.profile) continue;
+    const apps = user.applications || [];
+    const remaining = Math.max(0, (user.matches || []).length - user.currentJobIndex);
+    if (!apps.length && !remaining) continue; // nothing useful to say yet
+    summary.swept++;
+    try {
+      await pushFn(id, buildWeeklyDigest(user));
+      summary.sent++;
+    } catch (err) {
+      console.error(`❌ Digest push failed for ${id}:`, err.message);
+    }
+  }
+  console.log(`🗓️ Weekly digest: sent to ${summary.sent}/${summary.swept} user(s)`);
+  return summary;
+}
+
 // Custom-question relay (blueprint §6): ask the job's unknown required questions one
 // by one; each answer is saved to user.savedAnswers and reused on future applications.
 async function startRelay(user, from, questions, job) {
@@ -1166,6 +1210,13 @@ app.post("/admin/run-matches", async (req, res) => {
   runProactiveMatches().catch((e) => console.error("❌ proactive sweep:", e.message));
 });
 
+// ---- Admin: send the weekly digest to all active users (blueprint §119 heartbeat) ----
+app.post("/admin/send-digest", async (req, res) => {
+  if (!adminGuard(req, res)) return;
+  res.json({ started: true });
+  runDigestPush().catch((e) => console.error("❌ digest push:", e.message));
+});
+
 // Webhook verification (Kapso/Meta may GET the endpoint with a challenge to confirm it)
 app.get("/webhook", (req, res) =>
   res.status(200).send(req.query["hub.challenge"] || req.query.challenge || "ok")
@@ -1184,4 +1235,4 @@ if (require.main === module) {
   app.listen(PORT, () => console.log(`🚀 Job bot listening on port ${PORT}`));
 }
 
-module.exports = { handleInbound, getUser, users, buildDigest, runProactiveMatches, appliesInLast24h, applyQuotaExceeded, APPLIES_PER_DAY };
+module.exports = { handleInbound, getUser, users, buildDigest, buildWeeklyDigest, profileTip, runProactiveMatches, runDigestPush, appliesInLast24h, applyQuotaExceeded, APPLIES_PER_DAY };

@@ -4,6 +4,13 @@ Running recap of build sessions. Newest first. Each entry: what shipped, evals, 
 
 ---
 
+## 2026-07-06 — Weekly digest push + live deploy verified
+
+- **Deploy verified live** (whatshired-production.up.railway.app): health 200, webhook challenge echoes, /admin serves. Flagged to operator: ADMIN_TOKEN not set on Railway (dashboard/cron dead till set), no persistent volume yet (state wiped on redeploy), Razorpay in rzp_test mode.
+- **Weekly digest** (blueprint §119 heartbeat): runDigestPush() sends each active user buildWeeklyDigest() = tracker + one profileTip() nudge; skips empty/new users. Guarded POST /admin/send-digest for a weekly cron (DEPLOY.md §6). test-digest.js 10/10. flow still 32/32.
+
+---
+
 ## 2026-07-06 — Application status progression (blueprint §119)
 
 - Full ladder `Prepared → Submitted → Viewed → Response → Interview → Closed` (`STATUS_LADDER` + per-stage emoji, `statusRank`).
