@@ -60,9 +60,12 @@ backendforgr/
 ├── agents/
 │   ├── parser.js          # Level 1 agent: resume PDF -> profile JSON
 │   ├── matcher.js         # Level 1 agent: profile + job -> fit score
-│   ├── inquiry.js          # (not yet built) Level 2 agent: answers questions about a role
-│   └── apply.js            # (not yet built) Level 3 agent: tiered apply workflow
-├── lib/
+│   ├── inquiry.js         # Level 2 agent: answers questions about a role (built)
+│   ├── tailor.js          # Phase 2: per-job resume tailoring (built)
+│   ├── coverletter.js     # Phase 2: per-job cover letter (built)
+│   ├── editor.js          # profile field-level correction (built)
+│   └── apply.js            # Level 3 agent: tiered assisted apply (built)
+├── lib/                     # llm, messaging, jobs, ats, store, payments, checkout, email
 │   └── llm.js              # shared LLM client, model routing, retries, JSON validation
 └── resumes/                 # uploaded resumes — gitignored, contains PII
 ```
@@ -135,7 +138,13 @@ Current provider: **Kapso** (`MESSAGING_PROVIDER=kapso`) — a Meta WhatsApp Clo
 - [ ] Recruit 10 pilot users, run Wizard-of-Oz test on real jobs (see `PILOT.md`)
 - Phase 2 code-complete. Live activation needs external keys: ADZUNA (jobs), RAZORPAY (paywall), SMTP (Tier-1 email). Without them the bot runs on samples / no-paywall / assisted-apply — full flow still works.
 - [x] Profile-edit / navigation gaps (see memory) — RESOLVED: field-level correction via `agents/editor.js` (typed fixes now applied, not just logged); `back`/`edit`/PDF-resend all wired. See editor entry above.
-- [ ] `agents/apply.js` (not started — Phase 2, post-pilot-validation)
+- [x] `agents/apply.js` — BUILT (see the Assisted apply entry above). The earlier "not started" note is obsolete.
+
+### Genuinely NOT built (by design — external dependencies, not code gaps)
+- Tier-2 ATS auto-submit (needs each employer's ATS token) — assisted cheat-sheet covers it.
+- Automatic application status detection (needs user-granted Gmail/ATS parsing) — user drives status via the `update` command instead.
+- Approved WhatsApp message TEMPLATE for business-initiated push (proactive matches + weekly digest outside the 24h window) — the push engines are built; only Meta template approval is pending.
+- Multi-instance / Postgres / Kafka (CLAUDE.md §6 — deliberately deferred until the pilot validates the loop).
 
 ---
 
