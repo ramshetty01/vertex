@@ -482,9 +482,33 @@ async function startRelay(user, from, questions, job) {
   );
 }
 
+// Application rate limit (blueprint §46: "Rate-limit applications per user per day —
+// quality over volume also improves response rates"). Counts actual submissions
+// (user.applications, recorded at send time) in a rolling 24h window. 0 disables.
+const APPLIES_PER_DAY = parseInt(process.env.APPLIES_PER_DAY || "10", 10);
+function appliesInLast24h(user) {
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  return (user.applications || []).filter((a) => (a.ts || 0) >= cutoff).length;
+}
+const applyQuotaExceeded = (user) => APPLIES_PER_DAY > 0 && appliesInLast24h(user) >= APPLIES_PER_DAY;
+
 // Interested → tailor a resume, prepare the application, and ask for one-tap confirm
 // (CLAUDE.md §2.9: nothing goes out externally without explicit confirmation).
 function startApply(user, from, job) {
+  // Daily cap — refuse before spending LLM cost; let the user keep browsing.
+  if (applyQuotaExceeded(user)) {
+    user.state = "AWAITING_JOB_RESPONSE";
+    (async () => {
+      await sendMessage(
+        from,
+        `⏳ You've hit today's limit of *${APPLIES_PER_DAY} applications*. Quality beats volume — ` +
+          `targeted applications get more responses. I'll have fresh matches for you tomorrow!\n\n` +
+          `(You can still browse: reply *2* to skip or *3* to ask about this role.)`
+      );
+      persist(from);
+    })();
+    return;
+  }
   user.state = "PREPARING_APPLY";
   (async () => {
     try {
@@ -991,14 +1015,60 @@ app.post("/razorpay-webhook", async (req, res) => {
   }
 });
 
+// Mask a WhatsApp id (PII) for admin views: keep country-ish prefix + last 3 digits.
+function maskId(id) {
+  const digits = String(id).replace(/\D/g, "");
+  if (digits.length <= 5) return "***";
+  return `${digits.slice(0, 2)}***${digits.slice(-3)}`;
+}
+
+// Guard shared by admin routes. Returns true if allowed; else writes the response.
+function adminGuard(req, res) {
+  const token = process.env.ADMIN_TOKEN;
+  if (!token) { res.status(503).json({ error: "ADMIN_TOKEN not set" }); return false; }
+  const given = req.headers["x-admin-token"] || req.query.token;
+  if (given !== token) { res.status(403).json({ error: "forbidden" }); return false; }
+  return true;
+}
+
+// ---- Admin: pilot observability (aggregate, PII-masked). For Wizard-of-Oz monitoring. ----
+app.get("/admin/stats", (req, res) => {
+  if (!adminGuard(req, res)) return;
+  const rows = store.all();
+  const byState = {};
+  let paid = 0, totalApps = 0, submitted = 0, withProfile = 0;
+  const users = [];
+  for (const { id, user } of rows) {
+    byState[user.state] = (byState[user.state] || 0) + 1;
+    if (user.paid) paid++;
+    if (user.profile) withProfile++;
+    const apps = user.applications || [];
+    totalApps += apps.length;
+    submitted += apps.filter((a) => a.status === "Submitted").length;
+    users.push({
+      id: maskId(id),
+      state: user.state,
+      hasProfile: !!user.profile,
+      paid: !!user.paid,
+      matches: (user.matches || []).length,
+      applications: apps.length,
+    });
+  }
+  res.json({
+    users: rows.length,
+    withProfile,
+    paid,
+    byState,
+    applications: { total: totalApps, submitted },
+    detail: users.slice(0, 100),
+  });
+});
+
 // ---- Admin: trigger a proactive match sweep (blueprint §9 retention loop) ----
 // Guarded by ADMIN_TOKEN (X-Admin-Token header or ?token=). Refuses if unset so the
 // endpoint is never open by default. Intended for a cron/scheduler to hit on a timer.
 app.post("/admin/run-matches", async (req, res) => {
-  const token = process.env.ADMIN_TOKEN;
-  if (!token) return res.status(503).json({ error: "ADMIN_TOKEN not set" });
-  const given = req.headers["x-admin-token"] || req.query.token;
-  if (given !== token) return res.status(403).json({ error: "forbidden" });
+  if (!adminGuard(req, res)) return;
   res.json({ started: true }); // ack immediately; sweep runs in the background
   runProactiveMatches().catch((e) => console.error("❌ proactive sweep:", e.message));
 });
@@ -1021,4 +1091,4 @@ if (require.main === module) {
   app.listen(PORT, () => console.log(`🚀 Job bot listening on port ${PORT}`));
 }
 
-module.exports = { handleInbound, getUser, users, buildDigest, runProactiveMatches };
+module.exports = { handleInbound, getUser, users, buildDigest, runProactiveMatches, appliesInLast24h, applyQuotaExceeded, APPLIES_PER_DAY };

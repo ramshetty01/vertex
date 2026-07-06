@@ -4,6 +4,28 @@ Running recap of build sessions. Newest first. Each entry: what shipped, evals, 
 
 ---
 
+## 2026-07-06 — Phase 3 kickoff: pilot enablement
+
+Moved from "Phase 2 code-complete" toward running a pilot. The remaining pilot work is operator activation (deploy + keys) + recruiting; these are the engineering pieces that make a pilot **safe and observable**.
+
+### 1. Application rate-limit (blueprint §46) — `index.js`
+- `APPLIES_PER_DAY` (default 10, env, 0 disables). Rolling 24h count of REAL submissions (`user.applications` ts). Gate at the top of `startApply` — refuses BEFORE spending LLM cost, tells the user quality-over-volume, leaves them free to browse/skip/ask.
+- Exposed `appliesInLast24h` / `applyQuotaExceeded` for tests.
+- Eval `test-ratelimit.js` 7/7 (helper window math, at-cap tap refused + no PREPARING_APPLY, under-cap tap proceeds).
+
+### 2. Admin observability — `GET /admin/stats`
+- Aggregate for Wizard-of-Oz monitoring: user count, state breakdown, applications total/submitted, paid count, per-user detail with **PII-masked** ids (`91***869`). `ADMIN_TOKEN`-guarded.
+- Refactored the auth into a shared `adminGuard(req,res)` (run-matches now reuses it).
+- Verified live: 403 unauthorized, real JSON authorized.
+
+### 3. Pilot runbook — `PILOT.md`
+- Success metric (% of matches acted on), operator prerequisites, live-verify steps, onboarding, monitoring (stats + logs + applications.jsonl), retention cron, known soft spots, post-pilot decision gate.
+
+### Evals after this work
+parser(manual), matcher 4/4, inquiry 6/6, tailor 5/5, jobs 5/5, payments 11/11, apply 13/13, editor 6/6, proactive 12/12, coverletter 7/7, ratelimit 7/7, flow 22/22 — all green.
+
+---
+
 ## 2026-07-06 — Cover letter agent
 
 ### Cover letter — `agents/coverletter.js`
