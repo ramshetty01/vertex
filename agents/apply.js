@@ -88,12 +88,22 @@ function prepareApplication(profile, job, tailored, questions = [], savedAnswers
 }
 
 // Send the Tier-1 email application. Assumes user already confirmed.
-async function submitEmail(app, profile) {
+// Attaches the candidate's ACTUAL uploaded resume PDF when we have it (resumePath);
+// falls back to a text version of the letter only if no PDF is on file. Never sends a
+// file misleadingly named "resume" that isn't the resume.
+async function submitEmail(app, profile, resumePath = null) {
+  const attachments = [];
+  if (resumePath && fs.existsSync(resumePath)) {
+    const name = (profile && profile.name ? profile.name.replace(/[^a-z0-9]+/gi, "_") : "resume");
+    attachments.push({ filename: `${name}_resume.pdf`, path: resumePath });
+  } else if (app.emailText) {
+    attachments.push({ filename: "application.txt", content: app.emailText });
+  }
   return email.sendEmail({
     to: app.channel.to,
     subject: app.subject,
     text: app.emailText,
-    attachments: [{ filename: "resume.txt", content: app.emailText }],
+    attachments,
   });
 }
 

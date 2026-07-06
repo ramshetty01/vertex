@@ -944,7 +944,7 @@ async function handleInbound(inbound) {
           (async () => {
             try {
               if (app.channel.tier === "email") {
-                await applyAgent.submitEmail(app, user.profile);
+                await applyAgent.submitEmail(app, user.profile, user.resumePath);
                 applyAgent.recordApplication({
                   from, job: { title: job.title, company: job.company },
                   tier: "email", to: app.channel.to, status: "submitted",

@@ -2,7 +2,13 @@
 // Verifies tier detection, cheat-sheet build, and audit record shape.
 // Run: node test-apply.js
 
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 const applyAgent = require("./agents/apply");
+const emailLib = require("./lib/email");
+// Capture what submitEmail would send, without SMTP (same module instance apply.js uses).
+emailLib.sendEmail = async (opts) => opts;
 
 const profile = { name: "Ram D", skills: [{ name: "Python" }], titles: ["AI Intern"] };
 const tailored = {
@@ -57,5 +63,21 @@ check("cheat sheet includes cover letter", appCL.cheatSheet.includes("Cover lett
 const appEmailCL = applyAgent.prepareApplication(profile, { ...jobWithEmail, applyEmail: "careers@acme.io" }, tailored, [], {}, letter);
 check("no-cover-letter app → letter null, still builds", applyAgent.prepareApplication(profile, jobNoEmail, tailored).coverLetter === null);
 
-console.log(`\n${pass ? "✅ apply eval PASSED" : "❌ apply eval FAILED"}`);
-process.exit(pass ? 0 : 1);
+// submitEmail attaches the REAL uploaded PDF when we have one
+(async () => {
+  const appEmail = applyAgent.prepareApplication(profile, { ...jobWithEmail, applyEmail: "careers@acme.io" }, tailored, [], {}, letter);
+  appEmail.emailText = appEmail.emailText || "Cover letter body for email tier."; // submitEmail is email-tier only
+  const pdfPath = path.join(os.tmpdir(), `resume-${Date.now()}.pdf`);
+  fs.writeFileSync(pdfPath, "%PDF-1.4 fake");
+  const sent1 = await applyAgent.submitEmail(appEmail, profile, pdfPath);
+  check("email attaches real PDF by path", sent1.attachments.length === 1 && sent1.attachments[0].path === pdfPath);
+  check("attachment named .pdf", /\.pdf$/.test(sent1.attachments[0].filename));
+  fs.unlinkSync(pdfPath);
+
+  // No PDF on file → fall back to a text attachment, NOT a fake "resume"
+  const sent2 = await applyAgent.submitEmail(appEmail, profile, null);
+  check("no PDF → text fallback, not named resume", sent2.attachments[0].filename === "application.txt");
+
+  console.log(`\n${pass ? "✅ apply eval PASSED" : "❌ apply eval FAILED"}`);
+  process.exit(pass ? 0 : 1);
+})();

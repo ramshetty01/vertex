@@ -4,6 +4,14 @@ Running recap of build sessions. Newest first. Each entry: what shipped, evals, 
 
 ---
 
+## 2026-07-06 — Fix: email apply attaches the real resume PDF
+
+- Bug: submitEmail attached the cover-letter text as a file named `resume.txt` — a fake resume; the user's actual uploaded PDF was never sent.
+- Fix: attach the real `user.resumePath` PDF (nodemailer `path`), named `<Name>_resume.pdf`; fall back to `application.txt` only when no PDF is on file — never a misleadingly-named file. `submitEmail(app, profile, resumePath)`.
+- test-apply.js 16/16 (attaches real PDF by path, .pdf name, text fallback). flow 32/32.
+
+---
+
 ## 2026-07-06 — Weekly digest push + live deploy verified
 
 - **Deploy verified live** (whatshired-production.up.railway.app): health 200, webhook challenge echoes, /admin serves. Flagged to operator: ADMIN_TOKEN not set on Railway (dashboard/cron dead till set), no persistent volume yet (state wiped on redeploy), Razorpay in rzp_test mode.
