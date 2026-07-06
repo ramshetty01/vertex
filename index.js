@@ -1262,8 +1262,10 @@ app.get("/webhook", (req, res) =>
 // Health check
 app.get("/", (_req, res) => res.send("Job bot is running ✅"));
 
-// JSON health check (Test A) — for uptime monitors / Railway healthcheck.
-app.get("/health", (_req, res) => res.json({ ok: true }));
+// JSON health check (Test A). `startedAt` is fixed at process boot, so a change in
+// it across requests proves the server actually restarted (used to verify redeploys).
+const STARTED_AT = new Date().toISOString();
+app.get("/health", (_req, res) => res.json({ ok: true, startedAt: STARTED_AT }));
 
 // Only start the server + messaging client when run directly (not when imported for tests).
 if (require.main === module) {
