@@ -12,9 +12,11 @@ The one number that matters: **% of surfaced matches a user acts on** (Intereste
 ## 1. Operator prerequisites (things only you can do — external accounts)
 These block a fully-live pilot. The bot runs without them (samples / no-paywall / assisted-apply), but for a real pilot set:
 
-- [ ] **Deploy** to Railway with a persistent volume — see `DEPLOY.md`. Sets `BOT_DB_PATH=/data/bot.db`, `UPLOAD_DIR=/data/resumes`.
-- [ ] **Kapso webhook** pointed at the deployed `/webhook` (DEPLOY.md §5). Needed for real WhatsApp in/out.
-- [ ] `ADMIN_TOKEN` — random secret (already generated locally; set the same on Railway).
+- [x] **Deployed** to Railway — https://whatshired-production.up.railway.app (health/webhook-challenge/admin page all verified live).
+- [ ] **Persistent volume** — mount `/data`, set `BOT_DB_PATH=/data/bot.db`, `UPLOAD_DIR=/data/resumes`. ⚠️ NOT set yet — redeploys currently wipe all user state. Do this before onboarding anyone.
+- [ ] `ADMIN_TOKEN` — ⚠️ NOT set on Railway yet (`/admin/stats` returns 503). Set it (a value was generated for you) → unlocks the dashboard + both crons.
+- [ ] **Kapso webhook** pointed at `https://whatshired-production.up.railway.app/webhook` (DEPLOY.md §5). Needed for real WhatsApp in/out.
+- [ ] `BOT_WA_NUMBER` — the bot's public WhatsApp number (digits) so the `invite` command emits a real wa.me link.
 - [ ] **Razorpay** (optional for paywall pilot): `RAZORPAY_WEBHOOK_SECRET` + a registered webhook at `/razorpay-webhook`. Without it, pay-link users pay but don't auto-unlock. For a first pilot, consider leaving payments OFF (unset keys ⇒ everyone treated as paid) to measure the *loop*, not willingness to pay.
 - [ ] **SMTP** (optional): enables Tier-1 email auto-apply. Without it, apply falls back to the assisted cheat-sheet (always works).
 - [ ] `APPLIES_PER_DAY` — daily apply cap (default 10). Blueprint §46.
