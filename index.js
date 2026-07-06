@@ -15,11 +15,11 @@ const fs = require("fs");
 const path = require("path");
 const { parseResume } = require("./agents/parser");
 const editor = require("./agents/editor");
-const { findMatches } = require("./agents/matcher");
+const matcher = require("./agents/matcher");
 const { answerQuestion } = require("./agents/inquiry");
 const { tailorResume, formatTailoredPreview } = require("./agents/tailor");
 const applyAgent = require("./agents/apply");
-const { fetchJobs, dedupe } = require("./lib/jobs");
+const { fetchJobs, dedupe, jobKey } = require("./lib/jobs");
 const ats = require("./lib/ats");
 const payments = require("./lib/payments");
 const checkout = require("./lib/checkout");
@@ -105,6 +105,7 @@ function getUser(from) {
         applications: [],   // tracker: { title, company, tier, status, ts }
         matches: [],        // real scored jobs, filled in by the matcher
         currentJobIndex: 0,
+        seenJobKeys: [],    // every job key ever shown — so proactive push only surfaces NEW ones
       }
     );
   }
@@ -308,9 +309,10 @@ function startMatching(user, from) {
     try {
       const candidates = await sourceJobsForUser(user);
       const prefs = { ...user.intake, feedback: user.feedback };
-      const matches = await findMatches(user.profile, candidates, prefs, 75);
+      const matches = await matcher.findMatches(user.profile, candidates, prefs, 75);
       user.matches = matches;
       user.currentJobIndex = 0;
+      markSeen(user, matches); // remember these so proactive push won't repeat them
       console.log(`🎯 ${matches.length} match(es) ≥75% for ${from}`);
 
       if (matches.length === 0) {
@@ -338,6 +340,64 @@ function startMatching(user, from) {
       persist(from);
     }
   })();
+}
+
+// Record job keys as "shown" so the proactive matcher never re-pushes them.
+// Bounded to the last 500 keys so the list can't grow without limit.
+function markSeen(user, jobs) {
+  if (!user.seenJobKeys) user.seenJobKeys = [];
+  const set = new Set(user.seenJobKeys);
+  for (const j of jobs) set.add(jobKey(j));
+  user.seenJobKeys = Array.from(set).slice(-500);
+}
+
+// Proactive retention loop (blueprint §9): sweep every stored user who has finished
+// onboarding and run out of matches, re-source + re-score jobs, and push any that are
+// genuinely NEW (not seen before). Returns a summary for logging/admin.
+//
+// ⚠️ WhatsApp policy: a business-initiated message outside the user's 24h session
+// window requires an approved message TEMPLATE. Within 24h (active pilot users) a
+// plain message is fine. Template wiring is deferred until a template is approved;
+// this engine produces the content and does the matching either way.
+async function runProactiveMatches(pushFn = pushItem) {
+  const summary = { swept: 0, pushed: 0, users: [] };
+  for (const { id } of store.all()) {
+    const user = getUser(id); // canonical in-memory object (lazy-loads from store)
+    // Only nudge users who finished onboarding AND have nothing left to review.
+    if (!user.profile || user.state !== "DONE") continue;
+    summary.swept++;
+    try {
+      const candidates = await sourceJobsForUser(user);
+      const prefs = { ...user.intake, feedback: user.feedback };
+      const scored = await matcher.findMatches(user.profile, candidates, prefs, 75);
+      const seen = new Set(user.seenJobKeys || []);
+      const fresh = scored.filter((m) => !seen.has(jobKey(m)));
+      if (!fresh.length) continue;
+
+      const startIdx = user.matches.length;
+      user.matches = user.matches.concat(fresh);
+      user.currentJobIndex = startIdx; // point at the first new card
+      user.state = "AWAITING_JOB_RESPONSE";
+      markSeen(user, fresh);
+      summary.pushed += fresh.length;
+      summary.users.push(id);
+
+      await pushFn(id, {
+        interactive: {
+          body:
+            `🔔 ${fresh.length} new match${fresh.length > 1 ? "es" : ""} above 75% fit came in!\n\n` +
+            formatJobCard(fresh[0]),
+          buttons: JOB_BUTTONS,
+        },
+      });
+    } catch (err) {
+      console.error(`❌ Proactive match failed for ${id}:`, err.message);
+    } finally {
+      persist(id);
+    }
+  }
+  console.log(`🔔 Proactive sweep: ${summary.pushed} new match(es) to ${summary.users.length}/${summary.swept} user(s)`);
+  return summary;
 }
 
 // Advance past the current job and return an outbox item: the next job card as
@@ -929,6 +989,18 @@ app.post("/razorpay-webhook", async (req, res) => {
   }
 });
 
+// ---- Admin: trigger a proactive match sweep (blueprint §9 retention loop) ----
+// Guarded by ADMIN_TOKEN (X-Admin-Token header or ?token=). Refuses if unset so the
+// endpoint is never open by default. Intended for a cron/scheduler to hit on a timer.
+app.post("/admin/run-matches", async (req, res) => {
+  const token = process.env.ADMIN_TOKEN;
+  if (!token) return res.status(503).json({ error: "ADMIN_TOKEN not set" });
+  const given = req.headers["x-admin-token"] || req.query.token;
+  if (given !== token) return res.status(403).json({ error: "forbidden" });
+  res.json({ started: true }); // ack immediately; sweep runs in the background
+  runProactiveMatches().catch((e) => console.error("❌ proactive sweep:", e.message));
+});
+
 // Webhook verification (Kapso/Meta may GET the endpoint with a challenge to confirm it)
 app.get("/webhook", (req, res) =>
   res.status(200).send(req.query["hub.challenge"] || req.query.challenge || "ok")
@@ -947,4 +1019,4 @@ if (require.main === module) {
   app.listen(PORT, () => console.log(`🚀 Job bot listening on port ${PORT}`));
 }
 
-module.exports = { handleInbound, getUser, users, buildDigest };
+module.exports = { handleInbound, getUser, users, buildDigest, runProactiveMatches };

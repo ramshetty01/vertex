@@ -41,6 +41,15 @@ Do NOT set `PORT` — Railway injects it; the app reads `process.env.PORT`.
 - Kapso: `kapso whatsapp webhooks new --phone-number-id 597907523413541 --url "https://<app>.up.railway.app/webhook" --event whatsapp.message.received --active`
 - Razorpay dashboard → Webhooks → `https://<app>.up.railway.app/razorpay-webhook` (set the same secret as `RAZORPAY_WEBHOOK_SECRET`).
 
+## 6. Proactive match sweep (retention loop)
+- Set `ADMIN_TOKEN=<random-secret>` in the env.
+- Schedule a cron (Railway cron service, GitHub Actions, or any scheduler) to POST daily:
+  `curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" https://<app>.up.railway.app/admin/run-matches`
+- It re-scores jobs for every user who finished onboarding and ran out of matches, and pushes
+  only genuinely NEW jobs (deduped via each user's `seenJobKeys`).
+- ⚠️ WhatsApp policy: pushing a user outside their 24h session window needs an APPROVED template.
+  Within 24h (active pilot users) plain messages are fine. Wire a template before broad rollout.
+
 ## Notes
 - Keep `MESSAGING_PROVIDER=kapso`. `wwebjs` needs Chromium (heavy, stateful) — not for prod.
 - Optional build speed-up: set `PUPPETEER_SKIP_DOWNLOAD=true` (whatsapp-web.js pulls Chromium at install but kapso never uses it).
