@@ -4,6 +4,14 @@ Running recap of build sessions. Newest first. Each entry: what shipped, evals, 
 
 ---
 
+## 2026-07-06 — Admin dashboard (pilot monitoring UI)
+
+- **`public/admin.html`** + `GET /admin` route — visual Wizard-of-Oz dashboard: stat tiles (users / with-profile / paid / applications / submitted), users-by-state bars, per-user table (PII-masked ids), 10s auto-refresh, light/dark aware. Self-contained (inline CSS/JS, no CDN). Token entered at runtime, stored in the browser's localStorage only — never embedded in the page; sent as `X-Admin-Token` to the existing `/admin/stats`.
+- Verified: `/admin` serves 200 with the page; `/admin/stats` contract matches what the page renders. Browser screenshot skipped (extension offline this session) — page is static DOM over the already-verified JSON endpoint.
+- `PILOT.md` §4 updated to point at the dashboard. `test-flow.js` still 22/22 (route add, no handler change).
+
+---
+
 ## 2026-07-06 — Phase 3 kickoff: pilot enablement
 
 Moved from "Phase 2 code-complete" toward running a pilot. The remaining pilot work is operator activation (deploy + keys) + recruiting; these are the engineering pieces that make a pilot **safe and observable**.

@@ -30,7 +30,8 @@ Run these against the DEPLOYED url:
 - Wizard-of-Oz: you watch `GET /admin/stats` and the server logs. If the bot mis-handles something, you can (manually, out of band) nudge the user — the point is to learn where the loop breaks, not to have a perfect bot.
 
 ## 4. Monitoring (during the pilot)
-- **`GET /admin/stats`** — aggregate: user count, state breakdown, applications, paid. PII-masked ids. Poll it or curl on a loop.
+- **`/admin` dashboard** — open `https://<app>.up.railway.app/admin` in a browser, paste the admin token (stored in that browser only), watch it live: stat tiles, users-by-state bars, per-user table, auto-refresh every 10s. Best for Wizard-of-Oz.
+- **`GET /admin/stats`** — the raw JSON the dashboard reads (user count, state breakdown, applications, paid; PII-masked ids). Curl it if you prefer scripting.
 - **Server logs** — every inbound is logged `📩 [STATE] from: text`; matcher logs each job's fit %; proactive sweep logs pushes.
 - **`applications.jsonl`** — append-only audit of every prepared/sent application (gitignored, PII). Review before a user's interview.
 

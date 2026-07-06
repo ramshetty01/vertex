@@ -1031,6 +1031,9 @@ function adminGuard(req, res) {
   return true;
 }
 
+// Admin dashboard page (static HTML; the token is entered at runtime, not embedded).
+app.get("/admin", (_req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
+
 // ---- Admin: pilot observability (aggregate, PII-masked). For Wizard-of-Oz monitoring. ----
 app.get("/admin/stats", (req, res) => {
   if (!adminGuard(req, res)) return;
