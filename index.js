@@ -1115,8 +1115,13 @@ async function handleInbound(inbound) {
 
 // ---- Request providers (kapso, twilio): WhatsApp POSTs here ----
 app.post(["/", "/webhook"], async (req, res) => {
+  console.log("📥 POST /webhook"); // visible in Railway logs (Test B)
   const inbound = messaging.parseInbound(req);
-  if (!inbound) return res.sendStatus(200); // ignore non-message events (delivery receipts, etc.)
+  if (!inbound) {
+    console.log("   (non-message event — ignored)");
+    return res.sendStatus(200); // delivery receipts, status callbacks, etc.
+  }
+  console.log(`   incoming message from ${inbound.from}`);
   res.sendStatus(200); // ack fast, then handle
   handleInbound(inbound).catch((e) => console.error("❌ handler:", e.message));
 });
@@ -1256,6 +1261,9 @@ app.get("/webhook", (req, res) =>
 
 // Health check
 app.get("/", (_req, res) => res.send("Job bot is running ✅"));
+
+// JSON health check (Test A) — for uptime monitors / Railway healthcheck.
+app.get("/health", (_req, res) => res.json({ ok: true }));
 
 // Only start the server + messaging client when run directly (not when imported for tests).
 if (require.main === module) {
