@@ -3,15 +3,26 @@
 // paths, and checks the bot doesn't crash and routes correctly. Run: node test-flow.js
 
 process.env.MESSAGING_PROVIDER = "kapso"; // request provider → init is a no-op
+// llm.js constructs its client eagerly; the offline test never calls it (all stubbed),
+// but the client still needs a non-empty key to instantiate without throwing.
+process.env.NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || "offline-test-key";
 process.env.BOT_DB_PATH = require("path").join(require("os").tmpdir(), `bot-flow-${Date.now()}.db`);
 
 const messaging = require("./lib/messaging");
 const applyAgent = require("./agents/apply");
+const editor = require("./agents/editor"); // stubbed below — no LLM in the offline test
 
 let sent = [];
 messaging.sendMessage = async (to, body) => sent.push({ to, text: body });
 messaging.sendInteractive = async (to, spec) => sent.push({ to, spec });
 messaging.init = () => {};
+
+// Stub the profile editor: append a "Docker" skill so we can assert it was applied,
+// without hitting the LLM. index.js calls editor.applyCorrection (namespace) so this sticks.
+editor.applyCorrection = async (profile, _correction) => ({
+  ...profile,
+  skills: [...(profile.skills || []), { name: "Docker", years: null }],
+});
 
 const bot = require("./index.js");
 
@@ -108,6 +119,26 @@ const check = (n, ok) => { console.log(`  ${ok ? "✅" : "❌"} ${n}`); if (!ok)
   );
   check("saved question reused (known)", app2.knownAnswers.some((k) => /why do you want/i.test(k.label)));
   check("new question stays unknown", app2.unknownQuestions.some((q) => /Expected CTC/i.test(q.label)));
+
+  // ---- Profile edit: correction applied, then confirm → intake ----
+  const e = bot.getUser("u4");
+  e.profile = { name: "Ram", skills: [{ name: "Python", years: null }], titles: ["AI Intern"], total_experience_years: 0.5, education: [], locations: [] };
+  e.state = "CONFIRMING_PROFILE";
+
+  // typed correction → EDITING_PROFILE ack, background applies stubbed edit, back to CONFIRMING
+  sent = [];
+  await bot.handleInbound(inb("u4", "add Docker"));
+  check("correction acks + goes to edit", /Updating your profile/i.test(lastText()));
+  await wait(20); // let the background edit IIFE run
+  check("edit applied (Docker added)", bot.getUser("u4").profile.skills.some((s) => s.name === "Docker"));
+  check("edit re-shows summary", /Here's what I understood/i.test(lastText()));
+  check("back in CONFIRMING_PROFILE", bot.getUser("u4").state === "CONFIRMING_PROFILE");
+
+  // confirm → intake
+  sent = [];
+  await bot.handleInbound(inb("u4", "ok"));
+  check("confirm → asks location (intake)", /where do you want to work/i.test(lastText()));
+  check("state = INTAKE_LOCATION", bot.getUser("u4").state === "INTAKE_LOCATION");
 
   console.log(`\n${pass ? "✅ flow smoke test PASSED" : "❌ flow smoke test FAILED"}`);
   process.exit(pass ? 0 : 1);

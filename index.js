@@ -14,6 +14,7 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const { parseResume } = require("./agents/parser");
+const editor = require("./agents/editor");
 const { findMatches } = require("./agents/matcher");
 const { answerQuestion } = require("./agents/inquiry");
 const { tailorResume, formatTailoredPreview } = require("./agents/tailor");
@@ -180,6 +181,60 @@ async function downloadResume(inbound, from) {
   const filePath = path.join(UPLOAD_DIR, safeName);
   fs.writeFileSync(filePath, buf);
   return filePath;
+}
+
+// Parse a resume PDF in the background, then push the profile summary. Shared by the
+// initial upload AND a re-upload during edit. Caller sends the instant ack (§2.6).
+function startParse(user, from, inbound) {
+  user.state = "PARSING";
+  (async () => {
+    try {
+      user.resumePath = await downloadResume(inbound, from);
+      console.log(`📎 Resume saved: ${user.resumePath}`);
+      const profile = await parseResume(user.resumePath);
+      user.profile = profile;
+      console.log(`🧠 Parsed profile:`, JSON.stringify(profile));
+      user.state = "CONFIRMING_PROFILE";
+      await sendMessage(from, formatProfileSummary(profile));
+    } catch (err) {
+      console.error("❌ Parse error:", err.message);
+      user.state = "AWAITING_RESUME";
+      await sendMessage(
+        from,
+        err.message === "EMPTY_PDF"
+          ? "😅 I couldn't read that PDF — it may be scanned or locked. Please send a regular PDF."
+          : "Oops, something went wrong analyzing your resume. Please send it again."
+      );
+    } finally {
+      persist(from);
+    }
+  })();
+}
+
+// Apply a free-text correction to the confirmed-but-unconfirmed profile, then re-show
+// the summary for another confirm. Runs in the background (LLM ~10s) per §2.6.
+function startEdit(user, from, correction) {
+  const prev = user.profile;
+  user.state = "EDITING_PROFILE";
+  (async () => {
+    try {
+      const updated = await editor.applyCorrection(prev, correction);
+      user.profile = updated;
+      console.log(`✏️ Profile edited for ${from}:`, JSON.stringify(updated));
+      user.state = "CONFIRMING_PROFILE";
+      await sendMessage(from, formatProfileSummary(updated));
+    } catch (err) {
+      console.error("❌ Edit error:", err.message);
+      user.profile = prev; // never lose the working profile
+      user.state = "CONFIRMING_PROFILE";
+      await sendMessage(
+        from,
+        "Hmm, I couldn't apply that change. Reply *ok* to keep your profile as-is, or try rephrasing the fix."
+      );
+    } finally {
+      persist(from);
+    }
+  })();
 }
 
 // ---- Structured intake (blueprint Step 3) — the answers become matcher signals ----
@@ -482,10 +537,12 @@ async function handleInbound(inbound) {
       if (!user.profile) {
         reply("You haven't sent a resume yet — send it as a *PDF* to begin. 📄");
       } else {
-        user.state = "AWAITING_RESUME"; // keep existing profile until a new one parses
+        // Editable review: type a fix ("add Docker", "name is Ramesh") OR resend a PDF.
+        user.state = "CONFIRMING_PROFILE"; // current profile stays until a change is confirmed
         reply(
           formatProfileSummary(user.profile) +
-            "\n\nTo update, *send a new resume PDF*. (Your current profile stays until then.)"
+            "\n\n✏️ Tell me what to fix (e.g. \"add Docker\", \"I have 3 yrs Python\"), " +
+            "or send a new resume PDF. Reply *ok* when it looks right."
         );
       }
     } else if (cmd === "back" && inJobFlow && user.matches[user.currentJobIndex]) {
@@ -503,31 +560,7 @@ async function handleInbound(inbound) {
       case "AWAITING_RESUME": {
         if (numMedia > 0 && mediaType === "application/pdf") {
           reply("✅ Got your resume! Analyzing your profile... ⏳");
-          user.state = "PARSING";
-
-          // Background work — NOT awaited, webhook returns immediately
-          (async () => {
-            try {
-              user.resumePath = await downloadResume(inbound, from);
-              console.log(`📎 Resume saved: ${user.resumePath}`);
-              const profile = await parseResume(user.resumePath);
-              user.profile = profile;
-              console.log(`🧠 Parsed profile:`, JSON.stringify(profile));
-              user.state = "CONFIRMING_PROFILE";
-              await sendMessage(from, formatProfileSummary(profile));
-            } catch (err) {
-              console.error("❌ Parse error:", err.message);
-              user.state = "AWAITING_RESUME";
-              await sendMessage(
-                from,
-                err.message === "EMPTY_PDF"
-                  ? "😅 I couldn't read that PDF — it may be scanned or locked. Please send a regular PDF."
-                  : "Oops, something went wrong analyzing your resume. Please send it again."
-              );
-            } finally {
-              persist(from);
-            }
-          })();
+          startParse(user, from, inbound); // background parse, pushes summary when done
         } else if (numMedia > 0) {
           reply("That file type isn't supported yet — please send your resume as a *PDF*. 📄");
         } else {
@@ -548,19 +581,32 @@ async function handleInbound(inbound) {
 
       // ---------- Stage 2: confirm the parsed profile, then score real jobs ----------
       case "CONFIRMING_PROFILE": {
-        const confirmed = ["ok", "yes", "correct", "y", "👍"].includes(text.toLowerCase());
-        if (!confirmed) {
-          console.log(`✏️ Profile correction from ${from}: ${text}`);
+        // Re-uploading a resume here replaces the profile (edit-by-resend).
+        if (numMedia > 0 && mediaType === "application/pdf") {
+          reply("✅ Got your new resume! Re-analyzing... ⏳");
+          startParse(user, from, inbound);
+          break;
         }
+        const confirmed = ["ok", "yes", "correct", "y", "👍"].includes(text.toLowerCase());
+        if (confirmed) {
+          // Profile confirmed — collect preferences before matching (blueprint Step 3).
+          reply(
+            "Perfect! A few quick questions so I only send jobs that actually fit.\n\n" +
+              INTAKE_Q.location
+          );
+          user.state = "INTAKE_LOCATION";
+        } else {
+          // Anything else is a correction — apply it, re-show, re-confirm (§2.8: the
+          // user is stating their own facts, so this is not fabrication).
+          reply("✏️ Updating your profile with that... ⏳");
+          startEdit(user, from, text);
+        }
+        break;
+      }
 
-        // Profile confirmed — collect preferences before matching (blueprint Step 3).
-        reply(
-          (confirmed
-            ? "Perfect! A few quick questions so I only send jobs that actually fit.\n\n"
-            : "📝 Noted, I've logged that correction!\n\nA few quick questions so I only send jobs that actually fit.\n\n") +
-            INTAKE_Q.location
-        );
-        user.state = "INTAKE_LOCATION";
+      // ---------- Stage 2.1: applying a profile correction ----------
+      case "EDITING_PROFILE": {
+        reply("✏️ Still applying your change... ⏳ One moment!");
         break;
       }
 
