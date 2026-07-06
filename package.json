@@ -1,4 +1,14 @@
 {
+  "name": "whatshired",
+  "version": "1.0.0",
+  "description": "WhatsApp job assistant bot — parse, match, apply",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "axios": "^1.18.1",
     "better-sqlite3": "^12.11.1",

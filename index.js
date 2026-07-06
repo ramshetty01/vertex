@@ -75,8 +75,10 @@ const REASON_MAP = {
   r_company: "company",
 };
 
-const UPLOAD_DIR = path.join(__dirname, "resumes");
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR);
+// UPLOAD_DIR can point at a mounted volume in prod (e.g. /data/resumes) so uploads
+// survive redeploys; defaults to a local folder in dev.
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, "resumes");
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 // ---- Per-user conversation state — in-memory working set, backed by SQLite (§2.7) ----
 const users = new Map();
@@ -895,8 +897,8 @@ if (require.main === module) {
     onMessage: (inbound) =>
       handleInbound(inbound).catch((e) => console.error("❌ handler:", e.message)),
   });
-  const PORT = 3000;
-  app.listen(PORT, () => console.log(`🚀 Job bot listening on http://localhost:${PORT}`));
+  const PORT = process.env.PORT || 3000; // Railway/hosts inject PORT
+  app.listen(PORT, () => console.log(`🚀 Job bot listening on port ${PORT}`));
 }
 
 module.exports = { handleInbound, getUser, users, buildDigest };
