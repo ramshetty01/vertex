@@ -16,15 +16,15 @@ process.env.ADZUNA_APP_KEY = "";
 process.env.GREENHOUSE_BOARDS = ""; // ats.hasBoards() → false, skipped (no network)
 process.env.LEVER_COMPANIES = "";
 
-const messaging = require("./lib/messaging");
-const matcher = require("./agents/matcher");
+const messaging = require("../lib/messaging");
+const matcher = require("../agents/matcher");
 
 let sent = [];
 messaging.sendMessage = async (to, body) => sent.push({ to, text: body });
 messaging.sendInteractive = async (to, spec) => sent.push({ to, spec });
 messaging.init = () => {};
 
-const bot = require("./index.js");
+const bot = require("../index.js");
 
 let pass = true;
 const check = (n, ok, extra) => { console.log(`  ${ok ? "✅" : "❌"} ${n}${extra ? ` — ${extra}` : ""}`); if (!ok) pass = false; };
@@ -55,8 +55,8 @@ const JOB_B = { title: "ML Engineer", company: "DataCorp", location: "Remote", s
   p2.seenJobKeys = [];
 
   // Persist both to the store so store.all() sees them.
-  require("./lib/store").save("p1", p1);
-  require("./lib/store").save("p2", p2);
+  require("../lib/store").save("p1", p1);
+  require("../lib/store").save("p2", p2);
 
   // Stub matcher: every sweep "finds" both A and B.
   matcher.findMatches = async () => [JOB_A, JOB_B];
@@ -89,7 +89,7 @@ const JOB_B = { title: "ML Engineer", company: "DataCorp", location: "Remote", s
   const p1b = bot.getUser("p1");
   p1b.currentJobIndex = p1b.matches.length;
   p1b.state = "DONE";
-  require("./lib/store").save("p1", p1b);
+  require("../lib/store").save("p1", p1b);
   const pushed2 = [];
   await bot.runProactiveMatches(async (to, item) => pushed2.push({ to, item }));
   check("second sweep pushes nothing (all seen)", pushed2.length === 0, `pushed ${pushed2.length}`);

@@ -5,8 +5,8 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const applyAgent = require("./agents/apply");
-const emailLib = require("./lib/email");
+const applyAgent = require("../agents/apply");
+const emailLib = require("../lib/email");
 // Capture what submitEmail would send, without SMTP (same module instance apply.js uses).
 emailLib.sendEmail = async (opts) => opts;
 

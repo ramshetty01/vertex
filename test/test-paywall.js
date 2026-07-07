@@ -7,17 +7,17 @@ process.env.NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || "offline-test-key";
 process.env.FREE_CARDS = "3";
 process.env.BOT_DB_PATH = require("path").join(require("os").tmpdir(), `bot-paywall-${Date.now()}.db`);
 
-const messaging = require("./lib/messaging");
+const messaging = require("../lib/messaging");
 let sent = [];
 messaging.sendMessage = async (to, body) => sent.push({ to, text: body });
 messaging.sendInteractive = async (to, spec) => sent.push({ to, spec });
 messaging.init = () => {};
 
-const payments = require("./lib/payments");
+const payments = require("../lib/payments");
 payments.enabled = () => true;                                   // force paywall ON
 payments.createPaymentLink = async () => ({ url: "https://pay.test/abc", id: "plink_1" }); // no network
 
-const bot = require("./index.js");
+const bot = require("../index.js");
 const inb = (from, text) => ({ from, text, numMedia: 0, mediaType: null, downloadMedia: async () => Buffer.from("") });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const lastText = () => sent.map((s) => s.text || (s.spec && s.spec.body) || "").join(" || ");

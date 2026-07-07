@@ -9,7 +9,7 @@ process.env.PLAN_PRICE_INR = "149";
 
 const crypto = require("crypto");
 const axios = require("axios");
-const payments = require("./lib/payments");
+const payments = require("../lib/payments");
 
 let pass = true;
 const check = (name, ok) => {

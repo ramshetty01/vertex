@@ -9,7 +9,7 @@
 //   5. No leftover placeholder brackets like [Company].
 
 require("dotenv").config();
-const { writeCoverLetter } = require("./agents/coverletter");
+const { writeCoverLetter } = require("../agents/coverletter");
 
 const profile = {
   name: "Ram",

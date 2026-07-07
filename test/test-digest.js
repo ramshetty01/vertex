@@ -5,13 +5,13 @@ process.env.MESSAGING_PROVIDER = "kapso";
 process.env.NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || "offline-test-key";
 process.env.BOT_DB_PATH = require("path").join(require("os").tmpdir(), `bot-digest-${Date.now()}.db`);
 
-const messaging = require("./lib/messaging");
+const messaging = require("../lib/messaging");
 messaging.sendMessage = async () => {};
 messaging.sendInteractive = async () => {};
 messaging.init = () => {};
 
-const bot = require("./index.js");
-const store = require("./lib/store");
+const bot = require("../index.js");
+const store = require("../lib/store");
 
 let pass = true;
 const check = (n, ok, extra) => { console.log(`  ${ok ? "✅" : "❌"} ${n}${extra ? ` — ${extra}` : ""}`); if (!ok) pass = false; };

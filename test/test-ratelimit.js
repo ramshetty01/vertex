@@ -6,13 +6,13 @@ process.env.NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || "offline-test-key";
 process.env.APPLIES_PER_DAY = "2"; // low cap so the test is cheap; read at module load
 process.env.BOT_DB_PATH = require("path").join(require("os").tmpdir(), `bot-ratelimit-${Date.now()}.db`);
 
-const messaging = require("./lib/messaging");
+const messaging = require("../lib/messaging");
 let sent = [];
 messaging.sendMessage = async (to, body) => sent.push({ to, text: body });
 messaging.sendInteractive = async (to, spec) => sent.push({ to, spec });
 messaging.init = () => {};
 
-const bot = require("./index.js");
+const bot = require("../index.js");
 
 const inb = (from, text) => ({ from, text, numMedia: 0, mediaType: null, downloadMedia: async () => Buffer.from("") });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));

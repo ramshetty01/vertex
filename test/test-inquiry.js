@@ -3,7 +3,7 @@
 // Checks: answers from the posting, honest "not stated" when absent, ignores injection.
 
 require("dotenv").config();
-const { answerQuestion } = require("./agents/inquiry");
+const { answerQuestion } = require("../agents/inquiry");
 
 const job = {
   title: "AI Automation Intern",

@@ -3,7 +3,7 @@
 // Run: node test-ats.js
 
 require("dotenv").config();
-const ats = require("./lib/ats");
+const ats = require("../lib/ats");
 
 let pass = true;
 const check = (n, ok) => { console.log(`  ${ok ? "✅" : "❌"} ${n}`); if (!ok) pass = false; };

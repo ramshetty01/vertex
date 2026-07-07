@@ -3,7 +3,7 @@
 // must never include them. Run: node test-tailor.js
 
 require("dotenv").config();
-const { tailorResume } = require("./agents/tailor");
+const { tailorResume } = require("../agents/tailor");
 
 const profile = {
   name: "Ram Dyavarashetty",

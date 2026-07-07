@@ -4,7 +4,7 @@
 // Run: node test-jobs.js
 
 require("dotenv").config();
-const { normalizeAdzuna, dedupe, formatSalary, fetchJobs, hasCreds } = require("./lib/jobs");
+const { normalizeAdzuna, dedupe, formatSalary, fetchJobs, hasCreds } = require("../lib/jobs");
 
 // ---- Offline: a fixed Adzuna-shaped sample (no network) ----
 const sample = [

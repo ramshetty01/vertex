@@ -3,7 +3,7 @@
 // This is your first eval script: same profile, real-ish jobs, check the scores make sense.
 
 require("dotenv").config();
-const { findMatches } = require("./agents/matcher");
+const { findMatches } = require("../agents/matcher");
 
 // Ram's actual parsed profile (from the parser output)
 const profile = {

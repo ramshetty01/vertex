@@ -4,6 +4,7 @@
 // they need a live NIM key + network; run those individually when validating prompts.
 
 const { execFileSync } = require("child_process");
+const path = require("path");
 
 const SUITES = [
   "test-flow.js",
@@ -23,7 +24,7 @@ let failed = 0;
 for (const s of SUITES) {
   process.stdout.write(`▶ ${s} ... `);
   try {
-    execFileSync("node", [s], { stdio: ["ignore", "pipe", "pipe"] });
+    execFileSync("node", [path.join(__dirname, s)], { stdio: ["ignore", "pipe", "pipe"] });
     console.log("PASS");
   } catch (err) {
     failed++;

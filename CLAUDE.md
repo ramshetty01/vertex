@@ -24,7 +24,7 @@ These were each learned the hard way during initial build. Do not regress on the
 
 **2.4 Never trust raw LLM output — validate and clamp everything.** Every agent that returns JSON must: extract JSON defensively (regex match, not naive `JSON.parse` on raw content), clamp numeric ranges (e.g. fit score to 0–100), coerce types, and provide safe fallbacks for missing fields. See `agents/matcher.js` `scoreJob()` for the pattern to copy.
 
-**2.5 Every agent gets a test script before it's wired into the bot.** Pattern: `test-<agent>.js` at repo root, using a **fixed, realistic input** and a written **expected outcome** in comments/logs — not just "does it run," but "does it rank/score sensibly." Before wiring any agent into `index.js`, its test script must pass a sanity check on at least 3–4 varied cases (including at least one deliberately-bad case that should score low / get rejected). Keep these scripts; rerun them after every prompt or model change. They are the eval suite from the enterprise doc, grown organically.
+**2.5 Every agent gets a test script before it's wired into the bot.** Pattern: `test/test-<agent>.js` (all evals live in `test/`; run the offline suite with `npm test`), using a **fixed, realistic input** and a written **expected outcome** in comments/logs — not just "does it run," but "does it rank/score sensibly." Before wiring any agent into `index.js`, its test script must pass a sanity check on at least 3–4 varied cases (including at least one deliberately-bad case that should score low / get rejected). Keep these scripts; rerun them after every prompt or model change. They are the eval suite from the enterprise doc, grown organically.
 
 **2.6 Webhook handlers ack fast; heavy work happens async.** Twilio/Meta expect a response within ~15s. Any handler branch that calls an LLM or does slow I/O must: (a) send an immediate acknowledgment message via the TwiML response, (b) do the real work in a non-awaited async IIFE or background job, (c) push the result later via the REST API (`twilioClient.messages.create`), not the webhook's TwiML response. Never let a webhook response wait on an LLM call.
 
@@ -52,9 +52,11 @@ These were each learned the hard way during initial build. Do not regress on the
 backendforgr/
 ├── CLAUDE.md              # this file
 ├── index.js               # orchestrator: webhook + conversation state machine
-├── test-llm.js            # sanity ping for the LLM client
-├── test-matcher.js        # eval script for the matcher agent
-├── test-parser.js         # (add when parser eval script is built)
+├── test/                  # ALL evals here; `npm test` runs the offline suite (test-all.js)
+│   ├── test-all.js        # offline-suite runner (npm test)
+│   ├── test-flow.js       # state-machine smoke test (no LLM/network)
+│   ├── test-matcher.js    # eval script for the matcher agent
+│   └── test-*.js          # one per agent/feature
 ├── .env                   # secrets — NEVER commit
 ├── .gitignore             # must include .env, node_modules/, resumes/
 ├── agents/

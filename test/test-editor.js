@@ -10,7 +10,7 @@
 //   6. NO-FABRICATION (bad case) — "find me a better job" → profile UNCHANGED (off-topic, not a fact).
 
 require("dotenv").config();
-const { applyCorrection } = require("./agents/editor");
+const { applyCorrection } = require("../agents/editor");
 
 const base = () => ({
   name: "Ram",

@@ -4,7 +4,7 @@
 
 require("dotenv").config();
 const crypto = require("crypto");
-const checkout = require("./lib/checkout");
+const checkout = require("../lib/checkout");
 
 let pass = true;
 const check = (n, ok) => { console.log(`  ${ok ? "✅" : "❌"} ${n}`); if (!ok) pass = false; };

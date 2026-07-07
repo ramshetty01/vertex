@@ -8,13 +8,13 @@ const fs = require("fs");
 process.env.BOT_DB_PATH = path.join(os.tmpdir(), `bot-test-${Date.now()}.db`);
 process.env.MESSAGING_PROVIDER = "kapso";
 
-const messaging = require("./lib/messaging");
+const messaging = require("../lib/messaging");
 messaging.sendMessage = async () => {};
 messaging.sendInteractive = async () => {};
 messaging.init = () => {};
 
-const store = require("./lib/store");
-const bot = require("./index.js");
+const store = require("../lib/store");
+const bot = require("../index.js");
 const inb = (from, text) => ({ from, text, numMedia: 0, mediaType: null, downloadMedia: async () => Buffer.from("") });
 
 let pass = true;

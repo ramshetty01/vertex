@@ -9,9 +9,9 @@ process.env.NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || "offline-test-key";
 process.env.BOT_WA_NUMBER = "919876543210"; // for the invite command's wa.me link
 process.env.BOT_DB_PATH = require("path").join(require("os").tmpdir(), `bot-flow-${Date.now()}.db`);
 
-const messaging = require("./lib/messaging");
-const applyAgent = require("./agents/apply");
-const editor = require("./agents/editor"); // stubbed below — no LLM in the offline test
+const messaging = require("../lib/messaging");
+const applyAgent = require("../agents/apply");
+const editor = require("../agents/editor"); // stubbed below — no LLM in the offline test
 
 let sent = [];
 messaging.sendMessage = async (to, body) => sent.push({ to, text: body });
@@ -25,7 +25,7 @@ editor.applyCorrection = async (profile, _correction) => ({
   skills: [...(profile.skills || []), { name: "Docker", years: null }],
 });
 
-const bot = require("./index.js");
+const bot = require("../index.js");
 
 const inb = (from, text) => ({ from, text, numMedia: 0, mediaType: null, downloadMedia: async () => Buffer.from("") });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));

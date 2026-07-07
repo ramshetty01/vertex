@@ -3,10 +3,10 @@
 // Proves the full stack works in production. Run: node test-e2e.js
 
 require("dotenv").config();
-const { fetchJobs } = require("./lib/jobs");
-const { findMatches } = require("./agents/matcher");
-const { tailorResume } = require("./agents/tailor");
-const applyAgent = require("./agents/apply");
+const { fetchJobs } = require("../lib/jobs");
+const { findMatches } = require("../agents/matcher");
+const { tailorResume } = require("../agents/tailor");
+const applyAgent = require("../agents/apply");
 
 const profile = {
   name: "Ram Dyavarashetty",
