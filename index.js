@@ -26,6 +26,7 @@ const payments = require("./lib/payments");
 const checkout = require("./lib/checkout");
 const store = require("./lib/store");
 const messaging = require("./lib/messaging");
+const { config, logReadiness } = require("./lib/config");
 
 const app = express();
 app.use(express.urlencoded({ extended: false })); // Twilio posts form-encoded
@@ -553,7 +554,7 @@ async function startRelay(user, from, questions, job) {
 // Application rate limit (blueprint §46: "Rate-limit applications per user per day —
 // quality over volume also improves response rates"). Counts actual submissions
 // (user.applications, recorded at send time) in a rolling 24h window. 0 disables.
-const APPLIES_PER_DAY = parseInt(process.env.APPLIES_PER_DAY || "10", 10);
+const APPLIES_PER_DAY = config.appliesPerDay;
 function appliesInLast24h(user) {
   const cutoff = Date.now() - 24 * 60 * 60 * 1000;
   return (user.applications || []).filter((a) => (a.ts || 0) >= cutoff).length;
@@ -627,7 +628,7 @@ function startApply(user, from, job) {
 // Referral / growth loop — a forwardable pitch + a wa.me deep link to this bot.
 // BOT_WA_NUMBER is the bot's public WhatsApp number (digits, e.g. 9198…); if unset,
 // the message still works but without a tappable link.
-const BOT_WA_NUMBER = (process.env.BOT_WA_NUMBER || "").replace(/\D/g, "");
+const BOT_WA_NUMBER = config.botWaNumber;
 function inviteMessage() {
   const pitch =
     "🤖 Found a WhatsApp bot that matches jobs to your resume and helps you apply — all in chat. " +
@@ -642,7 +643,7 @@ function inviteMessage() {
 // (Interested/Inquire). The paywall only kicks in from card number FREE_CARDS+1
 // onward, so users get real value before being asked to pay. currentJobIndex is
 // 0-based, so index >= FREE_CARDS means they've already acted on that many cards.
-const FREE_CARDS = parseInt(process.env.FREE_CARDS || "3", 10);
+const FREE_CARDS = config.freeCards;
 const requiresPayment = (user) =>
   payments.enabled() && !user.paid && (user.currentJobIndex || 0) >= FREE_CARDS;
 
@@ -1213,7 +1214,7 @@ function maskId(id) {
 
 // Guard shared by admin routes. Returns true if allowed; else writes the response.
 function adminGuard(req, res) {
-  const token = process.env.ADMIN_TOKEN;
+  const token = config.adminToken;
   if (!token) { res.status(503).json({ error: "ADMIN_TOKEN not set" }); return false; }
   const given = req.headers["x-admin-token"] || req.query.token;
   if (given !== token) { res.status(403).json({ error: "forbidden" }); return false; }
@@ -1287,12 +1288,12 @@ app.get("/health", (_req, res) => res.json({ ok: true, startedAt: STARTED_AT }))
 
 // Only start the server + messaging client when run directly (not when imported for tests).
 if (require.main === module) {
+  logReadiness(); // boot-time config/integration readiness table
   messaging.init({
     onMessage: (inbound) =>
       handleInbound(inbound).catch((e) => console.error("❌ handler:", e.message)),
   });
-  const PORT = process.env.PORT || 3000; // Railway/hosts inject PORT
-  app.listen(PORT, () => console.log(`🚀 Job bot listening on port ${PORT}`));
+  app.listen(config.port, () => console.log(`🚀 Job bot listening on port ${config.port}`));
 }
 
 module.exports = { handleInbound, getUser, users, buildDigest, buildWeeklyDigest, profileTip, runProactiveMatches, runDigestPush, appliesInLast24h, applyQuotaExceeded, alreadyApplied, requiresPayment, APPLIES_PER_DAY, FREE_CARDS };

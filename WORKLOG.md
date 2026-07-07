@@ -20,6 +20,15 @@ Running recap of build sessions. Newest first. Each entry: what shipped, evals, 
 
 ---
 
+## 2026-07-07 — Enterprise hardening: config module + readiness + npm test
+
+- **lib/config.js** — single source of truth for app-level runtime config (port, provider, FREE_CARDS, APPLIES_PER_DAY, ADMIN_TOKEN, storage paths, bot number). index.js now reads these from config, not scattered process.env. Per-concern secrets stay encapsulated in their own lib modules.
+- **Boot readiness table** — logReadiness() prints a compact integration table at startup (LLM / messaging / jobs / payments / email / admin / persistent storage) with loud warnings for the two that bite in prod (no ADMIN_TOKEN, no volume). Exactly what would have surfaced the Railway misconfigs at a glance.
+- **npm test** — test-all.js runs the 11 offline suites, fails fast, summarises. package.json: test + dev scripts.
+- No logic refactor (working deployed system pre-pilot); tested by the full suite. npm test 11/11 green.
+
+---
+
 ## 2026-07-06 — Weekly digest push + live deploy verified
 
 - **Deploy verified live** (whatshired-production.up.railway.app): health 200, webhook challenge echoes, /admin serves. Flagged to operator: ADMIN_TOKEN not set on Railway (dashboard/cron dead till set), no persistent volume yet (state wiped on redeploy), Razorpay in rzp_test mode.

@@ -4,7 +4,9 @@
   "description": "WhatsApp job assistant bot — parse, match, apply",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "node index.js",
+    "test": "node test-all.js"
   },
   "engines": {
     "node": ">=20"
